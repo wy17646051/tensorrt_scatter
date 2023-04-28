@@ -1,0 +1,17 @@
+scatter_example:
+    _local:
+        _dim: &_dim 1
+        _dim_size: &_dim_size 10000
+    model:
+        dim: *_dim
+        dim_size: *_dim_size
+        reduce: max
+        before: None # torch.nn.Sequential(torch.nn.Linear(4, 16), torch.nn.ReLU(), torch.nn.Linear(16, 4))
+        after: None
+    data:
+        dim: *_dim
+        dim_size: *_dim_size
+        with_base: True
+    exports:
+        onnx_path: exports/scatter_example.onnx
+        trt_path: exports/scatter_example.engine
