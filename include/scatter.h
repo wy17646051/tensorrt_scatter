@@ -3,6 +3,9 @@
 
 #include <vector>
 #include <tuple>
+#ifdef BUILD_PTLAUNCH
+#include <torch/extension.h>
+#endif
 
 #include "common/reduction.h"
 
@@ -41,5 +44,13 @@ template <typename scalar_t, ReductionType REDUCE>
 int32_t scatter_launch(const scalar_t *src, const std::vector<int32_t> &src_size, const int32_t *index, int32_t dim,
                        const scalar_t *base, std::tuple<scalar_t*, int32_t*> out, const std::vector<int32_t> &out_size,
                        cudaStream_t stream);
+
+#ifdef BUILD_PTLAUNCH
+//! \warning This function does not do any input legitimacy checking and is mainly used as a wrapper for testing the 
+//! scatter_launch function on python.
+int64_t scatter_ptlaunth(const torch::Tensor src, const torch::Tensor index, int64_t dim, 
+                         const torch::optional<torch::Tensor> base, const std::string& reduce, torch::Tensor out, 
+                         torch::optional<torch::Tensor> arg_out);
+#endif
 
 #endif // TRTS_SCATTER_H

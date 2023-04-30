@@ -13,7 +13,7 @@ At present, the project only implements the **scatter** operator, and it is only
 
 | Supporting Operators                                         | TensorRT Version | CUDA Version |
 | ------------------------------------------------------------ | ---------------- | ------------ |
-| [**scatter**](https://pytorch-scatter.readthedocs.io/en/latest/functions/scatter.html) (sum, add, mul, min, max) | 8.5.x            | 11.6         |
+| [**scatter**](https://pytorch-scatter.readthedocs.io/en/latest/functions/scatter.html) (sum, add, mean, mul, min, max) | 8.5.x            | 11.6         |
 
 ## Installation
 

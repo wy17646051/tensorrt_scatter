@@ -3,11 +3,11 @@ from pathlib import Path
 import numpy as np
 import torch
 import torch_scatter
-from torch_scatter.utils import broadcast
+
 
 class BaseExample(torch.nn.Module):
 
-    def __init__(self, before=None, after=None):
+    def __init__(self, before='None', after='None'):
         super(BaseExample, self).__init__()
         self.before = eval(before)
         self.after = eval(after)
@@ -26,27 +26,24 @@ class BaseExample(torch.nn.Module):
 
 class ScatterExample(BaseExample):
 
-    def __init__(self, dim, dim_size, reduce, before=None, after=None):
+    def __init__(self, dim, dim_size, reduce, before='None', after='None'):
         super(ScatterExample, self).__init__(before, after)
         self.dim = dim
         self.dim_size = dim_size
         self.reduce = reduce
+
+        self.scatter_op = getattr(torch_scatter, f'scatter_{self.reduce}')
     
     def forward_op(self, src, index, base=None):
-        src = src.contiguous()
-        index = broadcast(index, src, self.dim).contiguous()
-        base = base.contiguous() if base is not None else None
-        
-        out = getattr(torch_scatter, f'scatter_{self.reduce}')(
-            src, index, self.dim, base, self.dim_size)
-        return out
-    
+        return self.scatter_op(src, index, self.dim, base, self.dim_size)
 
-def iter_data(prep_fn, *args, **kwargs):
-    file_list = list((Path(__file__).parent.parent / 'data').glob('*.npy'))
+
+def iter_data(prep_fn=None, *args, **kwargs):
+    file_list = list((Path(__file__).parent.parent / 'data').glob('*.bin'))
     for file in file_list:
-        src = torch.from_numpy(np.load(file))
-        yield prep_fn(src, *args, **kwargs)
+        src = np.fromfile(file, dtype=np.float32).reshape(-1, 5)
+        src = torch.from_numpy(src)
+        yield prep_fn(src, *args, **kwargs) if prep_fn is not None else src
 
 
 def scatter_prep_fn(src, dim, dim_size, with_base=False):

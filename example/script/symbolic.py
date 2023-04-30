@@ -3,6 +3,23 @@ import warnings
 from torch.onnx import symbolic_helper
 
 
+def _broadcast(g, src, other, dim):
+    _get_rank = symbolic_helper._get_tensor_rank
+
+    if dim < 0:
+        dim = _get_rank(other) + dim
+
+    if _get_rank(src) == 1:
+        for _ in range(0, dim):
+            src = symbolic_helper._unsqueeze_helper(g, src, axes_i=[0])
+
+    for _ in range(_get_rank(src), _get_rank(other)):
+        src = symbolic_helper._unsqueeze_helper(g, src, axes_i=[_get_rank(src)])
+
+    shape = g.op("Shape", other)
+    return g.op("Expand", src, shape)
+
+
 @symbolic_helper.parse_args('v', 'v', 'i', 'v', 'i', 's')
 def scatter(g, src, index, dim, out, dim_size, reduce):
     if dim_size is None:
@@ -13,6 +30,8 @@ def scatter(g, src, index, dim, out, dim_size, reduce):
         )
     if reduce not in ['sum', 'mean', 'mul', 'min', 'max']:
         raise ValueError("Only support `sum`, `mean`, `mul`, `min`, `max` reduce type")
+    
+    index = _broadcast(g, index, src, dim)
     
     args = [src, index]
     if not symbolic_helper._is_none(out):

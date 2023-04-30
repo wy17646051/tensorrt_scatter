@@ -3,6 +3,10 @@
 #include <numeric>
 #include <string>
 
+#ifdef BUILD_PTLAUNCH
+#include <torch/extension.h>
+#endif
+
 #include "common/reduction.cuh"
 #include "common/reduction.h"
 #include "common/utils.cuh"
@@ -27,8 +31,8 @@ SCATTER_LAUNCH_INSTANTIATION_TR(T, ReductionType::MIN)                          
 SCATTER_LAUNCH_INSTANTIATION_TR(T, ReductionType::MAX)
 
 template <typename scalar_t, ReductionType REDUCE>
-__global__ void scatter_kernel(const scalar_t *src, const int32_t src_numel, const int32_t *index, scalar_t *out,
-                               int32_t E, int32_t K, int32_t N)
+__global__ void scatter_kernel(const scalar_t *src, int32_t src_numel, const int32_t *index, scalar_t *out, int32_t E, 
+                               int32_t K, int32_t N)
 {
     int thread_idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (thread_idx >= src_numel)
@@ -42,8 +46,8 @@ __global__ void scatter_kernel(const scalar_t *src, const int32_t src_numel, con
 }
 
 template <typename scalar_t>
-__global__ void scatter_arg_kernel(const scalar_t *src, const int32_t src_numel, const int32_t *index,
-                                   const scalar_t *out, int32_t *arg_out, int32_t E, int32_t K, int32_t N)
+__global__ void scatter_arg_kernel(const scalar_t *src, int32_t src_numel, const int32_t *index, const scalar_t *out, 
+                                   int32_t *arg_out, int32_t E, int32_t K, int32_t N)
 {
     int thread_idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (thread_idx >= src_numel)
@@ -58,6 +62,21 @@ __global__ void scatter_arg_kernel(const scalar_t *src, const int32_t src_numel,
         arg_out[b * N * K + idx * K + k] = e;
 }
 
+template <typename scalar_t>
+__global__ void scatter_count_kernel(const int32_t *index, int32_t src_numel, scalar_t *out, int32_t E, int32_t K, 
+                                     int32_t N)
+{
+    int thread_idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (thread_idx >= src_numel)
+        return;
+
+    int b = thread_idx / (E * K);
+    int k = thread_idx % K;
+    int idx = index[thread_idx];
+
+    Reducer<scalar_t, ReductionType::SUM>::atomic_write(out + b * N * K + idx * K + k, (scalar_t)1);
+}
+
 //! \todo src, index, base, out must be contiguous
 //! \todo test different devices
 //! \todo broadcast index
@@ -65,9 +84,9 @@ __global__ void scatter_arg_kernel(const scalar_t *src, const int32_t src_numel,
 //! \todo half is unreliable
 template <typename scalar_t, ReductionType REDUCE>
 int32_t scatter_launch(const scalar_t *src, const std::vector<int32_t> &src_size, const int32_t *index, int32_t dim,
-                       const scalar_t *base, std::tuple<scalar_t*, int32_t*> out,
-                       const std::vector<int32_t> &out_size, cudaStream_t stream)
-{
+                       const scalar_t *base, std::tuple<scalar_t*, int32_t*> out, const std::vector<int32_t> &out_size, 
+                       cudaStream_t stream)
+{    
     if (dim < 0)
         dim += src_size.size();
 
@@ -103,6 +122,21 @@ int32_t scatter_launch(const scalar_t *src, const std::vector<int32_t> &src_size
     if ((REDUCE == ReductionType::MIN || REDUCE == ReductionType::MAX) && std::get<1>(out) != nullptr)
         scatter_arg_kernel<scalar_t>
         <<<BLOCKS(src_numel), THREADS, 0, stream>>>(src, src_numel, index, std::get<0>(out), std::get<1>(out), E, K, N);
+    if (REDUCE == ReductionType::MEAN)
+    {
+        scalar_t *count;
+        cudaMallocAsync(&count, sizeof(scalar_t) * out_numel, stream);
+        
+        fill_kernel<scalar_t>
+        <<<BLOCKS(out_numel), THREADS, 0, stream>>>(count, out_numel, (scalar_t)0);
+        scatter_count_kernel<scalar_t>
+        <<<BLOCKS(src_numel), THREADS, 0, stream>>>(index, src_numel, count, E, K, N);
+
+        div_kernel<scalar_t>
+        <<<BLOCKS(out_numel), THREADS, 0, stream>>>(std::get<0>(out), out_numel, count, true);
+
+        cudaFreeAsync(count, stream);
+    }
 
     return 0;
 }
@@ -134,3 +168,78 @@ int32_t scatter_launch(const scalar_t *src, const std::vector<int32_t> &src_size
 SCATTER_LAUNCH_INSTANTIATION(half)
 SCATTER_LAUNCH_INSTANTIATION(float)
 
+#ifdef BUILD_PTLAUNCH
+int64_t scatter_ptlaunth(const torch::Tensor src, const torch::Tensor index, int64_t dim, 
+                         const torch::optional<torch::Tensor> base, const std::string& reduce, torch::Tensor out, 
+                         torch::optional<torch::Tensor> arg_out)
+{
+    int64_t status = -1;
+
+    std::vector<int32_t> _src_size(src.sizes().data(), src.sizes().data()+src.sizes().size());
+    int32_t _dim = (int32_t)dim;
+    std::vector<int32_t> _out_size(out.sizes().data(), out.sizes().data() + out.sizes().size());
+
+    auto index_int32 = index.to(torch::kInt32);
+    auto _index = index_int32.data_ptr<int32_t>();
+    
+    torch::optional<torch::Tensor> arg_out_int32 = torch::nullopt;
+    int32_t* _arg_out = nullptr;
+    if (arg_out.has_value())
+    {
+        arg_out_int32 = arg_out.value().to(torch::kInt32);
+        _arg_out = arg_out_int32.value().data_ptr<int32_t>();
+    }
+
+    cudaStream_t stream;
+    cudaStreamCreate(&stream);
+
+    if (src.dtype() == torch::kHalf)
+    {
+        auto _src = reinterpret_cast<half *>(src.data_ptr<at::Half>());
+        auto _base = base != torch::nullopt ? \
+             reinterpret_cast<half *>(base.value().data_ptr<at::Half>()) : nullptr;
+        auto _out = std::tuple<half *const, int32_t *const>(reinterpret_cast<half *>(out.data_ptr<at::Half>()), _arg_out);
+
+        AT_DISPATCH_REDUCTION_TYPES(reduce, [&] {
+            if (base != torch::nullopt)
+                status = scatter_launch<half, REDUCE>(_src, _src_size, _index, _dim, _base, _out, _out_size, stream);
+            else
+                status = scatter_launch<half, REDUCE>(_src, _src_size, _index, _dim, _out, _out_size, stream);
+        });
+    }
+    else if (src.dtype() == torch::kFloat)
+    {
+        auto _src = src.data_ptr<float>();    
+        auto _base = base != torch::nullopt ? base.value().data_ptr<float>() : nullptr;
+        auto _out = std::tuple<float *const, int32_t *const>(out.data_ptr<float>(), _arg_out);
+
+        AT_DISPATCH_REDUCTION_TYPES(reduce, [&] {
+            if (base != torch::nullopt)
+                status = scatter_launch<float, REDUCE>(_src, _src_size, _index, _dim, _base, _out, _out_size, stream);
+            else
+                status = scatter_launch<float, REDUCE>(_src, _src_size, _index, _dim, _out, _out_size, stream);
+        });
+    }
+    else
+    {
+        throw std::runtime_error("scatter: unsupported data type");
+    }
+
+    if (arg_out.has_value())
+    {
+        at::Tensor arg_out_int64 = arg_out_int32.value().to(torch::kInt64);
+        cudaMemcpyAsync(
+            arg_out.value().data_ptr<int64_t>(), arg_out_int64.data_ptr<int64_t>(), 
+            sizeof(int64_t) * arg_out.value().numel(), cudaMemcpyDeviceToDevice, stream
+        );
+    }
+
+    cudaStreamDestroy(stream);
+    return status;
+}
+
+TORCH_LIBRARY(tensorrt_scatter, m)
+{
+    m.def("scatter_ptlaunth", scatter_ptlaunth);
+}
+#endif
