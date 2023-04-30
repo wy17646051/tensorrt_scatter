@@ -33,7 +33,7 @@
 
 # Other files
 __pycache__/
-.idea/
+.pytest_cache/
 .vscode/
 build/
-test/
+others/
