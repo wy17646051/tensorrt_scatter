@@ -38,6 +38,24 @@ class ScatterExample(BaseExample):
         return self.scatter_op(src, index, self.dim, base, self.dim_size)
 
 
+class SegmentCOOExample(BaseExample):
+    def __init__(self, dim_size, reduce, before='None', after='None'):
+        super(SegmentCOOExample, self).__init__(before, after)
+        self.dim_size = dim_size
+        self.reduce = reduce
+    
+    def forward_op(self, src, index, base=None):
+        return getattr(torch_scatter, f'segment_{self.reduce}_coo')(src, index, base, self.dim_size)
+
+
+class GatherCOOExample(BaseExample):
+    def __init__(self, before='None', after='None'):
+        super(GatherCOOExample, self).__init__(before, after)
+    
+    def forward_op(self, src, index, base=None):
+        return torch_scatter.gather_coo(src, index, base)
+
+
 def iter_data(prep_fn=None, *args, **kwargs):
     file_list = list((Path(__file__).parent.parent / 'data').glob('*.bin'))
     for file in file_list:

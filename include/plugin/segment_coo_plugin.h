@@ -1,5 +1,5 @@
-#ifndef TRTS_SCATTER_PLUGIN_H
-#define TRTS_SCATTER_PLUGIN_H
+#ifndef TRTS_SEGMENT_COO_PLUGIN_H
+#define TRTS_SEGMENT_COO_PLUGIN_H
 
 #include <string>
 #include <NvInferPlugin.h>
@@ -11,12 +11,12 @@ namespace tensorrt_scatter
 namespace plugin
 {
 
-class ScatterPlugin : public nvinfer1::IPluginV2DynamicExt
+class SegmentCOOPlugin : public nvinfer1::IPluginV2DynamicExt
 {
 public:
-    ScatterPlugin() = delete;
-    ScatterPlugin(int32_t dim, size_t dimSize, ReductionType reduce);
-    ScatterPlugin(const void* data, size_t length);
+    SegmentCOOPlugin() = delete;
+    SegmentCOOPlugin(size_t dimSize, ReductionType reduce);
+    SegmentCOOPlugin(const void* data, size_t length);
 
     void setWithBase(bool withBase) noexcept;
     bool getWithBase() const noexcept;
@@ -53,16 +53,15 @@ public:
 
 private:
     std::string mPluginNamespace;
-    int32_t mDim;
     size_t mDimSize;
     ReductionType mReduce;
     bool mWithBase;
 };
 
-class ScatterPluginCreator : public nvinfer1::IPluginCreator
+class SegmentCOOPluginCreator : public nvinfer1::IPluginCreator
 {
 public:
-    ScatterPluginCreator();
+    SegmentCOOPluginCreator();
     const nvinfer1::AsciiChar* getPluginName() const noexcept override;
     const nvinfer1::AsciiChar* getPluginVersion() const noexcept override;
     const nvinfer1::PluginFieldCollection* getFieldNames() noexcept override;
@@ -80,4 +79,4 @@ private:
 } // namespace plugin
 } // namespace torch_scatter
 
-#endif // TRTS_SCATTER_PLUGIN_H
+#endif // TRTS_SEGMENT_COO_PLUGIN_H

@@ -25,7 +25,8 @@ if(BUILD_PTLAUNCH)
     
     find_package(Python3 REQUIRED COMPONENTS Development)
     execute_process(
-        COMMAND ${Python_EXECUTABLE} -c "import torch.utils; print(torch.utils.cmake_prefix_path)"
+        # COMMAND ${Python_EXECUTABLE} -c "import torch.utils; print(torch.utils.cmake_prefix_path)"
+        COMMAND python3 -c "import torch.utils; print(torch.utils.cmake_prefix_path)"
         OUTPUT_STRIP_TRAILING_WHITESPACE
         OUTPUT_VARIABLE LIBTORCH_PREFIX_PATH
     )

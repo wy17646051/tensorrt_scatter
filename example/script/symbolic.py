@@ -1,5 +1,6 @@
 import warnings
 
+import torch
 from torch.onnx import symbolic_helper
 
 
@@ -71,3 +72,71 @@ def scatter_min(g, src, index, dim, out, dim_size):
 
 def scatter_max(g, src, index, dim, out, dim_size):
     return scatter(g, src, index, dim, out, dim_size, 'max')
+
+
+@symbolic_helper.parse_args('v', 'v', 'v', 'i', 's')
+def segment_coo(g, src, index, out, dim_size, reduce):
+    if dim_size is None:
+        warnings.warn(
+            "Warning: If use of TensorRT, please indicate `dim_size`. " 
+            "The output shape of the Tensorrt plugin should be determined by the input shape. "
+            "Dynamic calculation by inputs data is not allowed."
+        )
+    if reduce not in ['sum', 'mean', 'min', 'max']:
+        raise ValueError("Only support `sum`, `mean`, `min`, `max` reduce type")
+    
+    index_rank = symbolic_helper._get_tensor_rank(index)
+    size = symbolic_helper._get_tensor_sizes(src)[:index_rank]
+    
+    size = g.op("Constant", value_t=torch.LongTensor(size))
+    index = g.op("Expand", index, size)
+    
+    args = [src, index]
+    if not symbolic_helper._is_none(out):
+        args.append(out)
+    
+    kwargs = {
+        'reduce_s': reduce 
+    }
+    if dim_size is not None:
+        kwargs['dim_size_i'] = dim_size
+
+    outputs = 2 if reduce in ['min', 'max'] else 1
+
+    return g.op("tensorrt_scatter::TRTS_SegmentCOO", *args, **kwargs, outputs=outputs)
+
+
+def segment_sum_coo(g, src, index, out, dim_size):
+    return segment_coo(g, src, index, out, dim_size, 'sum')
+
+
+def segment_add_coo(g, src, index, out, dim_size):
+    return segment_sum_coo(g, src, index, out, dim_size)
+
+
+def segment_mean_coo(g, src, index, out, dim_size):
+    return segment_coo(g, src, index, out, dim_size, 'mean')
+
+
+def segment_min_coo(g, src, index, out, dim_size):
+    return segment_coo(g, src, index, out, dim_size, 'min')
+
+
+def segment_max_coo(g, src, index, out, dim_size):
+    return segment_coo(g, src, index, out, dim_size, 'max')
+
+
+@symbolic_helper.parse_args('v', 'v', 'v')
+def gather_coo(g, src, index, out):   
+    index_rank = symbolic_helper._get_tensor_rank(index)
+    size = symbolic_helper._get_tensor_sizes(src)[:index_rank]
+    size[index_rank-1] = symbolic_helper._get_tensor_sizes(index)[-1]
+    
+    size = g.op("Constant", value_t=torch.LongTensor(size))
+    index = g.op("Expand", index, size)
+    
+    args = [src, index]
+    if not symbolic_helper._is_none(out):
+        args.append(out)
+
+    return g.op("tensorrt_scatter::TRTS_GatherCOO", *args)

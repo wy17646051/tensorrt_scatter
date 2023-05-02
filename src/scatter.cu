@@ -1,7 +1,7 @@
-#include <vector>
-#include <tuple>
 #include <numeric>
 #include <string>
+#include <tuple>
+#include <vector>
 
 #ifdef BUILD_PTLAUNCH
 #include <torch/extension.h>
@@ -42,7 +42,8 @@ __global__ void scatter_kernel(const scalar_t *src, int32_t src_numel, const int
     int k = thread_idx % K;
     int idx = index[thread_idx];
 
-    Reducer<scalar_t, REDUCE>::atomic_write(out + b * N * K + idx * K + k, src[thread_idx]);
+    scalar_t reduce_val = src != nullptr ? src[thread_idx]: (scalar_t)1;
+    Reducer<scalar_t, REDUCE>::atomic_write(out + b * N * K + idx * K + k, reduce_val);
 }
 
 template <typename scalar_t>
@@ -62,23 +63,8 @@ __global__ void scatter_arg_kernel(const scalar_t *src, int32_t src_numel, const
         arg_out[b * N * K + idx * K + k] = e;
 }
 
-template <typename scalar_t>
-__global__ void scatter_count_kernel(const int32_t *index, int32_t src_numel, scalar_t *out, int32_t E, int32_t K, 
-                                     int32_t N)
-{
-    int thread_idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (thread_idx >= src_numel)
-        return;
-
-    int b = thread_idx / (E * K);
-    int k = thread_idx % K;
-    int idx = index[thread_idx];
-
-    Reducer<scalar_t, ReductionType::SUM>::atomic_write(out + b * N * K + idx * K + k, (scalar_t)1);
-}
-
 //! \todo src, index, base, out must be contiguous
-//! \todo test different devices
+//! \todo test different devices (cudaSetDevice(src.get_device());)
 //! \todo broadcast index
 //! \todo mean divide by N
 //! \todo half is unreliable
@@ -86,12 +72,12 @@ template <typename scalar_t, ReductionType REDUCE>
 int32_t scatter_launch(const scalar_t *src, const std::vector<int32_t> &src_size, const int32_t *index, int32_t dim,
                        const scalar_t *base, std::tuple<scalar_t*, int32_t*> out, const std::vector<int32_t> &out_size, 
                        cudaStream_t stream)
-{    
-    if (dim < 0)
-        dim += src_size.size();
-
+{
     if (src_size.size() != out_size.size())
         return -1;
+
+    dim = dim < 0 ? dim + src_size.size() : dim;
+    
     for (auto i = 0; i < src_size.size(); i++)
         if (i != dim && src_size[i] != out_size[i])
             return -1;
@@ -129,8 +115,8 @@ int32_t scatter_launch(const scalar_t *src, const std::vector<int32_t> &src_size
         
         fill_kernel<scalar_t>
         <<<BLOCKS(out_numel), THREADS, 0, stream>>>(count, out_numel, (scalar_t)0);
-        scatter_count_kernel<scalar_t>
-        <<<BLOCKS(src_numel), THREADS, 0, stream>>>(index, src_numel, count, E, K, N);
+        scatter_kernel<scalar_t, ReductionType::SUM>
+        <<<BLOCKS(src_numel), THREADS, 0, stream>>>(nullptr, src_numel, index, count, E, K, N);
 
         div_kernel<scalar_t>
         <<<BLOCKS(out_numel), THREADS, 0, stream>>>(std::get<0>(out), out_numel, count, true);
@@ -198,7 +184,8 @@ int64_t scatter_ptlaunth(const torch::Tensor src, const torch::Tensor index, int
         auto _src = reinterpret_cast<half *>(src.data_ptr<at::Half>());
         auto _base = base != torch::nullopt ? \
              reinterpret_cast<half *>(base.value().data_ptr<at::Half>()) : nullptr;
-        auto _out = std::tuple<half *const, int32_t *const>(reinterpret_cast<half *>(out.data_ptr<at::Half>()), _arg_out);
+        auto _out = std::tuple<half *const, int32_t *const>(
+            reinterpret_cast<half *>(out.data_ptr<at::Half>()), _arg_out);
 
         AT_DISPATCH_REDUCTION_TYPES(reduce, [&] {
             if (base != torch::nullopt)
@@ -238,7 +225,7 @@ int64_t scatter_ptlaunth(const torch::Tensor src, const torch::Tensor index, int
     return status;
 }
 
-TORCH_LIBRARY(tensorrt_scatter, m)
+TORCH_LIBRARY_FRAGMENT(tensorrt_scatter, m)
 {
     m.def("scatter_ptlaunth", scatter_ptlaunth);
 }

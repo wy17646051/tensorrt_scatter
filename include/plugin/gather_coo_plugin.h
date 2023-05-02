@@ -1,22 +1,19 @@
-#ifndef TRTS_SCATTER_PLUGIN_H
-#define TRTS_SCATTER_PLUGIN_H
+#ifndef TRTS_GATHER_COO_PLUGIN_H
+#define TRTS_GATHER_COO_PLUGIN_H
 
 #include <string>
 #include <NvInferPlugin.h>
-
-#include "common/reduction.h"
 
 namespace tensorrt_scatter
 {
 namespace plugin
 {
 
-class ScatterPlugin : public nvinfer1::IPluginV2DynamicExt
+class GatherCOOPlugin : public nvinfer1::IPluginV2DynamicExt
 {
 public:
-    ScatterPlugin() = delete;
-    ScatterPlugin(int32_t dim, size_t dimSize, ReductionType reduce);
-    ScatterPlugin(const void* data, size_t length);
+    GatherCOOPlugin();
+    GatherCOOPlugin(const void* data, size_t length);
 
     void setWithBase(bool withBase) noexcept;
     bool getWithBase() const noexcept;
@@ -53,16 +50,13 @@ public:
 
 private:
     std::string mPluginNamespace;
-    int32_t mDim;
-    size_t mDimSize;
-    ReductionType mReduce;
     bool mWithBase;
 };
 
-class ScatterPluginCreator : public nvinfer1::IPluginCreator
+class GatherCOOPluginCreator : public nvinfer1::IPluginCreator
 {
 public:
-    ScatterPluginCreator();
+    GatherCOOPluginCreator();
     const nvinfer1::AsciiChar* getPluginName() const noexcept override;
     const nvinfer1::AsciiChar* getPluginVersion() const noexcept override;
     const nvinfer1::PluginFieldCollection* getFieldNames() noexcept override;
@@ -73,11 +67,10 @@ public:
 
 private:
     static nvinfer1::PluginFieldCollection mFC;
-    static std::vector<nvinfer1::PluginField> mPluginAttributes;
     std::string mPluginNamespace;
 };
 
 } // namespace plugin
 } // namespace torch_scatter
 
-#endif // TRTS_SCATTER_PLUGIN_H
+#endif // TRTS_GATHER_COO_PLUGIN_H
