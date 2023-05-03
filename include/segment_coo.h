@@ -1,8 +1,8 @@
 #ifndef TRTS_SEGMENT_COO_H
 #define TRTS_SEGMENT_COO_H
 
-#include <vector>
 #include <tuple>
+#include <vector>
 #ifdef BUILD_PTLAUNCH
 #include <torch/extension.h>
 #endif

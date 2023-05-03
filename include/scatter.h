@@ -1,8 +1,8 @@
 #ifndef TRTS_SCATTER_H
 #define TRTS_SCATTER_H
 
-#include <vector>
 #include <tuple>
+#include <vector>
 #ifdef BUILD_PTLAUNCH
 #include <torch/extension.h>
 #endif

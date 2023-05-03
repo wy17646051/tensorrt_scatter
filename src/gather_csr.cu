@@ -1,4 +1,4 @@
-#include <string>
+#include <numeric>
 #include <vector>
 
 #include "common/utils.cuh"
