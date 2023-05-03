@@ -5,15 +5,10 @@ import pytest
 import tensorrt as trt
 import torch
 import torch_scatter
-from torch.onnx import register_custom_op_symbolic
 from torch_scatter.utils import broadcast
 
 import testing
-from example.script import symbolic
 from example.script.model import ScatterExample
-
-for _reduce in ['_sum', '_add', '_mul', '_mean', '_min', '_max', '']:
-    register_custom_op_symbolic(f'torch_scatter::scatter{_reduce}', getattr(symbolic, f'scatter{_reduce}'), 11)
 
 cases_general = [
     (

@@ -13,10 +13,13 @@ CURRENT_DIR = osp.dirname(osp.abspath(__file__))
 PROJECT_DIR = osp.dirname(CURRENT_DIR)
 LIBTENSORRTSCATTER = osp.join(PROJECT_DIR, 'build', 'libtensorrtscatter.so')
 
-ctypes.CDLL(LIBTENSORRTSCATTER)
-torch.ops.load_library(LIBTENSORRTSCATTER)
 sys.path.insert(1, PROJECT_DIR)
 import example
+from example.script.symbolic import register_symbolic
+
+ctypes.CDLL(LIBTENSORRTSCATTER)
+torch.ops.load_library(LIBTENSORRTSCATTER)
+register_symbolic(op_name=None, opset_version=9)
 
 
 def case_composite(*cases: List[Dict]) -> List:

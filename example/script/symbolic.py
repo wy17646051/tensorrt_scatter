@@ -1,7 +1,27 @@
 import warnings
 
 import torch
-from torch.onnx import symbolic_helper
+from torch.onnx import register_custom_op_symbolic, symbolic_helper
+
+
+def register_symbolic(op_name=None, opset_version=9):
+    """Register symbolic function for `torch_scatter` operators.
+    
+    Args:
+        op_name (str): Operator name, if None, register all operators. Default: None.
+        opset_version (int): The Maximum opset version of the ONNX supported. Default: 9.
+    """
+    if op_name is None:
+        _reduce = ['_sum', '_add', '_mean', '_min', '_max', '']
+        for _reduce in _reduce:
+            register_custom_op_symbolic(f'torch_scatter::scatter{_reduce}', eval(f'scatter{_reduce}'), opset_version)
+            register_custom_op_symbolic(f'torch_scatter::segment{_reduce}_coo', eval(f'segment{_reduce}_coo'), opset_version)
+            register_custom_op_symbolic(f'torch_scatter::segment{_reduce}_csr', eval(f'segment{_reduce}_csr'), opset_version)
+        register_custom_op_symbolic(f'torch_scatter::scatter_mul', scatter_mul, opset_version)
+        register_custom_op_symbolic(f'torch_scatter::gather_coo', gather_coo, opset_version)
+        register_custom_op_symbolic(f'torch_scatter::gather_csr', gather_csr, opset_version)
+    else:
+        register_custom_op_symbolic(f'torch_scatter::{op_name}', eval(op_name), opset_version)
 
 
 def _broadcast(g, src, other, dim):

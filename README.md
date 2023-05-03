@@ -8,15 +8,18 @@
 
 
 
+
 ---
 
-At present, the project is only tested on TensorRT 8.5x and CUDA11.6 (*this does not mean that other versions cannot run, but it should be used with caution*). TensorRT Plugins corresponding to other operators will come soon, and test on more environments.
+At present, the project is only tested on **TensorRT 8.5.x** and **CUDA 11.6**, *this does not mean that other versions cannot run, but it should be used with caution*.
 
 | Supporting Operators                                         | TensorRT Version | CUDA Version |
 | ------------------------------------------------------------ | ---------------- | ------------ |
 | [**scatter**](https://pytorch-scatter.readthedocs.io/en/latest/functions/scatter.html) (sum, add, mean, mul, min, max) | 8.5.x            | 11.6         |
 | [**segment_coo**](https://pytorch-scatter.readthedocs.io/en/latest/functions/segment_coo.html) (sum, add, mean, min, max) | 8.5.x            | 11.6         |
-| **gather_coo**                                               |                  |              |
+| **gather_coo**                                               | 8.5.x            | 11.6         |
+| [**segment_csr**](https://pytorch-scatter.readthedocs.io/en/latest/functions/segment_csr.html) (sum, add, mean, min, max) | 8.5.x            | 11.6         |
+| **gather_csr**                                               | 8.5.x            | 11.6         |
 
 ## Installation
 
@@ -38,17 +41,8 @@ The project additionally provides the **symbolic function** corresponding to the
 Make sure to **register** the **symbol function** before calling `torch.onnx.export` to export the onnx model, *e.g.*:
 
 ```python
-from torch.onnx import register_custom_op_symbolic
-from example.script import symbolic
-
-for _reduce in ['_sum', '_add', '_mul', '_mean', '_min', '_max', '']:
-    register_custom_op_symbolic(
-      f'torch_scatter::scatter{_reduce}', getattr(symbolic, f'scatter{_reduce}'), 9)
-
-for _reduce in ['_sum', '_add', '_mean', '_min', '_max', '']:
-    register_custom_op_symbolic(f'torch_scatter::segment{_reduce}_coo', getattr(symbolic, f'segment{_reduce}_coo'), 9)
-
-register_custom_op_symbolic(f'torch_scatter::gather_coo', symbolic.gather_coo, 9)
+from example.script.symbolic import register_symbolic
+register_symbolic(op_name=None, opset_version=9)
 ```
 
 ## Example

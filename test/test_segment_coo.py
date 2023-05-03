@@ -5,14 +5,9 @@ import pytest
 import tensorrt as trt
 import torch
 import torch_scatter
-from torch.onnx import register_custom_op_symbolic
 
 import testing
-from example.script import symbolic
 from example.script.model import SegmentCOOExample
-
-for _reduce in ['_sum', '_add', '_mean', '_min', '_max', '']:
-    register_custom_op_symbolic(f'torch_scatter::segment{_reduce}_coo', getattr(symbolic, f'segment{_reduce}_coo'), 11)
 
 cases_general = [
     (

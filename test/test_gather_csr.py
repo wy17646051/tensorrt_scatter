@@ -5,14 +5,9 @@ import pytest
 import tensorrt as trt
 import torch
 import torch_scatter
-from torch.onnx import register_custom_op_symbolic
 
 import testing
-from example.script import symbolic
 from example.script.model import GatherCSRExample
-
-register_custom_op_symbolic(f'torch_scatter::gather_csr', symbolic.gather_csr, 11)
-
 
 cases_general = [
     (
