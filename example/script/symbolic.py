@@ -140,3 +140,46 @@ def gather_coo(g, src, index, out):
         args.append(out)
 
     return g.op("tensorrt_scatter::TRTS_GatherCOO", *args)
+
+
+@symbolic_helper.parse_args('v', 'v', 'v', 's')
+def segment_csr(g, src, indptr, out, reduce):
+    if reduce not in ['sum', 'mean', 'min', 'max']:
+        raise ValueError("Only support `sum`, `mean`, `min`, `max` reduce type")
+    
+    indptr_rank = symbolic_helper._get_tensor_rank(indptr)
+    size = symbolic_helper._get_tensor_sizes(src)[:indptr_rank]
+    size[-1] = symbolic_helper._get_tensor_sizes(indptr)[-1]
+    
+    size = g.op("Constant", value_t=torch.LongTensor(size))
+    indptr = g.op("Expand", indptr, size)
+    
+    args = [src, indptr]
+    if not symbolic_helper._is_none(out):
+        args.append(out)
+    
+    kwargs = {'reduce_s': reduce}
+
+    outputs = 2 if reduce in ['min', 'max'] else 1
+
+    return g.op("tensorrt_scatter::TRTS_SegmentCSR", *args, **kwargs, outputs=outputs)
+
+
+def segment_sum_csr(g, src, indptr, out):
+    return segment_csr(g, src, indptr, out, 'sum')
+
+
+def segment_add_csr(g, src, indptr, out):
+    return segment_sum_csr(g, src, indptr, out)
+
+
+def segment_mean_csr(g, src, indptr, out):
+    return segment_csr(g, src, indptr, out, 'mean')
+
+
+def segment_min_csr(g, src, indptr, out):
+    return segment_csr(g, src, indptr, out, 'min')
+
+
+def segment_max_csr(g, src, indptr, out):
+    return segment_csr(g, src, indptr, out, 'max')

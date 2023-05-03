@@ -49,11 +49,8 @@ struct Reducer
             *val = *val * new_val;
         else if (REDUCE == DIV)
             *val = *val / new_val;
-        else if ((REDUCE == MIN && new_val < *val) ||
-                 (REDUCE == MAX && new_val > *val))
-        {
+        else if ((REDUCE == MIN && new_val < *val) || (REDUCE == MAX && new_val > *val))
             *val = new_val;
-        }
     }
 
     static inline __host__ __device__ void update(scalar_t *val, scalar_t new_val, int32_t *arg, int32_t new_arg)
@@ -64,11 +61,25 @@ struct Reducer
             *val = *val * new_val;
         else if (REDUCE == DIV)
             *val = *val / new_val;
-        else if ((REDUCE == MIN && new_val < *val) ||
-                 (REDUCE == MAX && new_val > *val))
+        else if ((REDUCE == MIN && new_val < *val) || (REDUCE == MAX && new_val > *val))
         {
             *val = new_val;
             *arg = new_arg;
+        }
+    }
+
+    static inline __host__ __device__ void write(scalar_t *address, scalar_t val, int count)
+    {
+        if (REDUCE == SUM || REDUCE == MUL || REDUCE == DIV)
+            *address = val;
+        else if (REDUCE == MEAN)
+            *address = val / (scalar_t)(count > 0 ? count : 1);
+        else if (REDUCE == MIN || REDUCE == MAX)
+        {
+            if (count > 0)
+                *address = val;
+            else
+                *address = (scalar_t)0;
         }
     }
 

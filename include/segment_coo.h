@@ -23,9 +23,9 @@ int32_t segment_coo_launch(const scalar_t *src, const std::vector<int32_t> &src_
 #ifdef BUILD_PTLAUNCH
 //! \warning This function does not do any input legitimacy checking and is mainly used as a wrapper for testing the 
 //! segment_coo_launch function on python.
-int64_t scatter_ptlaunth(const torch::Tensor src, const torch::Tensor index, int64_t dim, 
-                         const torch::optional<torch::Tensor> base, const std::string& reduce, torch::Tensor out, 
-                         torch::optional<torch::Tensor> arg_out);
+int64_t segment_coo_ptlaunth(const torch::Tensor src, const torch::Tensor index, 
+                             const torch::optional<torch::Tensor> base, const std::string& reduce, torch::Tensor out, 
+                             torch::optional<torch::Tensor> arg_out);
 #endif
 
 #endif // TRTS_SEGMENT_COO_H

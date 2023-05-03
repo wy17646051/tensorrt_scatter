@@ -56,6 +56,15 @@ class GatherCOOExample(BaseExample):
         return torch_scatter.gather_coo(src, index, base)
 
 
+class SegmentCSRExample(BaseExample):
+    def __init__(self, reduce, before='None', after='None'):
+        super(SegmentCSRExample, self).__init__(before, after)
+        self.reduce = reduce
+    
+    def forward_op(self, src, index, base=None):
+        return getattr(torch_scatter, f'segment_{self.reduce}_csr')(src, index, base)
+
+
 def iter_data(prep_fn=None, *args, **kwargs):
     file_list = list((Path(__file__).parent.parent / 'data').glob('*.bin'))
     for file in file_list:
