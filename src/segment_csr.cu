@@ -30,18 +30,6 @@ SEGMENT_CSR_LAUNCH_INSTANTIATION_TR(T, ReductionType::DIV)                      
 SEGMENT_CSR_LAUNCH_INSTANTIATION_TR(T, ReductionType::MIN)                                                             \
 SEGMENT_CSR_LAUNCH_INSTANTIATION_TR(T, ReductionType::MAX)
 
-inline __device__ int indptr_to_offset(const int32_t *indptr_size, int32_t indptr_dim, int32_t idx) 
-{
-    int offset = idx % (indptr_size[indptr_dim - 1] - 1), stride = 1;
-    idx /= indptr_size[indptr_dim - 1] - 1;
-    for (int i = indptr_dim - 2; i >= 0; --i) {
-        stride *= indptr_size[i + 1];
-        offset += (idx % indptr_size[i]) * stride;
-        idx /= indptr_size[i];
-    }
-    return offset;
-}
-
 template <typename scalar_t, ReductionType REDUCE, int TB>
 __global__ void segment_csr_kernel(const scalar_t *src, const int32_t *indptr, const int32_t *indptr_size, 
                                    int32_t indptr_dim, scalar_t *out, int32_t *arg_out, size_t N, size_t E)

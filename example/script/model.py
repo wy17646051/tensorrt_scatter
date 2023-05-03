@@ -65,6 +65,14 @@ class SegmentCSRExample(BaseExample):
         return getattr(torch_scatter, f'segment_{self.reduce}_csr')(src, index, base)
 
 
+class GatherCSRExample(BaseExample):
+    def __init__(self, before='None', after='None'):
+        super(GatherCSRExample, self).__init__(before, after)
+    
+    def forward_op(self, src, indptr, base=None):
+        return torch_scatter.gather_csr(src, indptr, base)
+
+
 def iter_data(prep_fn=None, *args, **kwargs):
     file_list = list((Path(__file__).parent.parent / 'data').glob('*.bin'))
     for file in file_list:

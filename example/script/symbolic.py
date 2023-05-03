@@ -149,7 +149,7 @@ def segment_csr(g, src, indptr, out, reduce):
     
     indptr_rank = symbolic_helper._get_tensor_rank(indptr)
     size = symbolic_helper._get_tensor_sizes(src)[:indptr_rank]
-    size[-1] = symbolic_helper._get_tensor_sizes(indptr)[-1]
+    size[indptr_rank-1] = symbolic_helper._get_tensor_sizes(indptr)[-1]
     
     size = g.op("Constant", value_t=torch.LongTensor(size))
     indptr = g.op("Expand", indptr, size)
@@ -183,3 +183,26 @@ def segment_min_csr(g, src, indptr, out):
 
 def segment_max_csr(g, src, indptr, out):
     return segment_csr(g, src, indptr, out, 'max')
+
+
+@symbolic_helper.parse_args('v', 'v', 'v')
+def gather_csr(g, src, indptr, out):
+    if out is None:
+        warnings.warn(
+            "Warning: The output shape cannot be calculated by the shape of `scr` or `inddptr`. If this operator is "
+            "applied to TensorRT, `out` must be specified and its shape should be guaranteed to be fixed, otherwise an "
+            "unknown error will occur."
+        )
+
+    indptr_rank = symbolic_helper._get_tensor_rank(indptr)
+    size = symbolic_helper._get_tensor_sizes(src)[:indptr_rank]
+    size[indptr_rank-1] = symbolic_helper._get_tensor_sizes(indptr)[-1]
+
+    size = g.op("Constant", value_t=torch.LongTensor(size))
+    indptr = g.op("Expand", indptr, size)
+    
+    args = [src, indptr]
+    if not symbolic_helper._is_none(out):
+        args.append(out)
+
+    return g.op("tensorrt_scatter::TRTS_GatherCSR", *args)

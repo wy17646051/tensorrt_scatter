@@ -38,4 +38,16 @@ __global__ void div_kernel(scalar_t *src, int32_t numel, const scalar_t *divisor
     src[thread_idx] /= divisor[thread_idx];
 }
 
+inline __host__ __device__ int indptr_to_offset(const int32_t *indptr_size, int32_t indptr_dim, int32_t idx) 
+{
+    int offset = idx % (indptr_size[indptr_dim - 1] - 1), stride = 1;
+    idx /= indptr_size[indptr_dim - 1] - 1;
+    for (int i = indptr_dim - 2; i >= 0; --i) {
+        stride *= indptr_size[i + 1];
+        offset += (idx % indptr_size[i]) * stride;
+        idx /= indptr_size[i];
+    }
+    return offset;
+}
+
 #endif // TRTS_COMMON_UTILS_H
