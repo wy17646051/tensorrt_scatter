@@ -3,7 +3,7 @@
 **[TensorRT](https://developer.nvidia.com/tensorrt) Plugin** of corresponding **[PyTorch Scatter](https://github.com/rusty1s/pytorch_scatter/tree/master) operators**.
 
 <p align="center">
-  <img width="76%" src="https://github.com/wy17646051/tensorrt_scatter/tree/master/docs/logo.png" />
+  <img width="76%" src="docs/logo.png" />
 </p>
 
 ---
